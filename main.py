@@ -45,4 +45,33 @@ async def start_command(message: types.Message):
     except Exception as e:
         logging.error(f"Ошибка при проверке подписки: {e}")
         # Защитная заглушка: если бота забыли добавить в админы GameMinute,
-        # он временно пропустит человека, чтобы у людей не ло
+        # он временно пропустит человека, чтобы у людей не ломалась кнопка.
+        is_subscribed = True 
+
+    # 2. ВЫДАЧА ФАЙЛА ИЛИ СТРОГИЙ ОТКАЗ
+    if is_subscribed:
+        # Если подписан — бот берет файл под нужным номером из архива и пересылает пользователю
+        try:
+            await bot.forward_message(
+                chat_id=user_id,
+                from_chat_id=ARCHIVE_CHAT_ID,
+                message_id=int(msg_id)
+            )
+        except Exception as e:
+            await message.answer("❌ Произошла ошибка при отправке файла. Возможно, этот файл был удален из архива.")
+            logging.error(f"Ошибка отправки файла: {e}")
+    else:
+        # Если НЕ подписан — создаем красивую кнопку-ссылку на основной канал
+        keyboard = InlineKeyboardMarkup()
+        btn_sub = InlineKeyboardButton(text="👉 Подписаться на GameMinute", url=MAIN_CHANNEL_URL)
+        keyboard.add(btn_sub)
+        
+        await message.answer(
+            "Вы не подписаны.\n"
+            "Чтобы получить файл, подпишитесь на наш канал:",
+            reply_markup=keyboard
+        )
+
+if __name__ == '__main__':
+    # Запуск бота в режиме постоянного ожидания сообщений
+    executor.start_polling(dp, skip_updates=True)
