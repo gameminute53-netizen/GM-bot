@@ -52,7 +52,7 @@ async def start_command(message: types.Message):
     if is_subscribed:
         # Если подписан — бот берет файл под нужным номером из архива и пересылает пользователю
         try:
-            await bot.forward_message(
+            await bot.copy_message(
                 chat_id=user_id,
                 from_chat_id=ARCHIVE_CHAT_ID,
                 message_id=int(msg_id)
