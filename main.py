@@ -10,7 +10,7 @@ from aiohttp import web
 logging.basicConfig(level=logging.INFO)
 
 # ТВОИ ТОЧНЫЕ ДАННЫЕ
-API_TOKEN = '8753693282:AAFf6fqHtdFdmkNvtjsvlN7LIfeonVbCjA4'
+API_TOKEN = '8753693282:AAEqZbBgVU6IIeP2DUEtnir5fCnGLIAy9gQ'
 MAIN_CHANNEL_URL = 'https://t.me/GameMinute'
 MAIN_CHANNEL_ID = '@GameMinute'
 ARCHIVE_CHAT_ID = -1004321162872
