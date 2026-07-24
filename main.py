@@ -23,7 +23,7 @@ REQUIRED_CHANNELS = [
 SPONSOR_LINKS = {
     "👉 Подписаться на GameMinute": "https://t.me/GameMinute",
      "👉 Подписаться на Спонсора 1": "https://t.me/+0R6zuL2Iadg4M2My",
-    # "👉 Подписаться на Спонсора 2": "https://t.me/sponsor_channel2",
+     "👉 Подписаться на Спонсора 2": "https://t.me/LK152",
 }
 # =========================================================
 
