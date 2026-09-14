@@ -6,35 +6,34 @@ from aiogram.utils import executor
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiohttp import web
 
-# Настройка логирования, чтобы видеть работу бота в панели Render
 logging.basicConfig(level=logging.INFO)
 
 # =========================================================
-# 📢 БЛОК НАСТРОЕК РЕКЛАМЫ (Сейчас тут только твой канал!)
+# 📢 НАСТРОЙКИ И СПИСКИ
 # =========================================================
-# 1. Список каналов для проверки. Тестовые спонсоры временно скрыты решетками #
+# ID администраторов, которым разрешено использовать /adrek и /delrek
+ADMIN_IDS = [5117783610] # 👈 ВПИШИ СВОЙ TELEGRAM ID (числом)
+
+# 1. Список юзернеймов или ID каналов для проверки ботом
 REQUIRED_CHANNELS = [
-    '@GameMinute',        # Твой основной канал
-    # '@sponsor_channel1',  # СКРЫТО: когда купят рекламу, просто убери # и впиши юзернейм
-    # '@sponsor_channel2',  # СКРЫТО
+    '@GameMinute',
+    # '@sponsor_channel',
 ]
 
-# 2. Кнопки со ссылками для пользователей. Рекламные кнопки тоже пока скрыты.
+# 2. Кнопки со ссылками для пользователей {"Текст": "Ссылка"}
 SPONSOR_LINKS = {
     "👉 Подписаться на GameMinute": "https://t.me/GameMinute",
-     "👉 Подписаться на Спонсора": "https://t.me/+0R6zuL2Iadg4M2My",
-     #"👉 Подписаться на Спонсора 2": "https://t.me/LK152",
+    "👉 Подписаться на Спонсора": "https://t.me/+0R6zuL2Iadg4M2My",
 }
 # =========================================================
 
-# ТВОИ ТОЧНЫЕ ДАННЫЕ
 API_TOKEN = '8753693282:AAEqZbBgVU6IIeP2DUEtnir5fCnGLIAy9gQ'
 ARCHIVE_CHAT_ID = -1004321162872
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
-# --- ФЕЙКОВЫЙ СЕРВЕР ДЛЯ ОБМАНА RENDER (чтобы работал UptimeRobot) ---
+# --- ФЕЙКОВЫЙ СЕРВЕР ДЛЯ RENDER ---
 async def handle(request):
     return web.Response(text="Bot is running smoothly!")
 
@@ -48,25 +47,87 @@ async def start_web_server():
     await site.start()
     logging.info(f"Фейковый веб-сервер запущен на порту {port}")
 
-# Функция автоматической проверки подписки на все открытые каналы
+# --- ФУНКЦИЯ ПРОВЕРКИ ПОДПИСОК ---
 async def check_all_subscriptions(user_id: int) -> bool:
-    for chat_id in REQUIRED_CHANNELS:
+    if not REQUIRED_CHANNELS:
+        return True
+
+    for channel in REQUIRED_CHANNELS:
         try:
-            user_status = await bot.get_chat_member(chat_id=chat_id, user_id=user_id)
-            if user_status.status not in ['member', 'administrator', 'creator']:
+            member = await bot.get_chat_member(chat_id=channel, user_id=user_id)
+            if member.status not in ['member', 'administrator', 'creator']:
                 return False
         except Exception as e:
-            logging.error(f"Ошибка при проверке подписки на {chat_id}: {e}")
-            # Если бот не админ в канале спонсора, пропускаем, чтобы бот не зависал
-            continue 
+            logging.error(f"Ошибка проверки канала {channel}: {e}")
+            # Если произошла ошибка (например, бот не админ или юзернейм кривой), 
+            # считаем, что подписки нет, чтобы не отдавать файл бесплатно
+            return False
     return True
+
+# --- ДОБАВЛЕНИЕ РЕКЛАМЫ ЧЕРЕЗ /adrek ---
+@dp.message_handler(commands=['adrek'])
+async def add_ad_command(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS and ADMIN_IDS != [123456789]:
+        return await message.answer("❌ У вас нет прав для этой команды.")
+
+    args = message.get_args().strip()
+    if not args:
+        return await message.answer("⚠️ Использование: `/adrek @username` или `/adrek https://t.me/username`", parse_mode="Markdown")
+
+    # Получаем чистое имя канала без ссылки
+    channel_username = args.split('/')[-1]
+    if not channel_username.startswith('@'):
+        channel_username = f"@{channel_username}"
+
+    try:
+        # Бот запрашивает информацию о канале, чтобы узнать его точное название
+        chat = await bot.get_chat(channel_username)
+        title = chat.title or channel_username
+        link = f"https://t.me/{chat.username}" if chat.username else args
+
+        if channel_username not in REQUIRED_CHANNELS:
+            REQUIRED_CHANNELS.append(channel_username)
+            
+        SPONSOR_LINKS[f"👉 Подписаться на {title}"] = link
+
+        await message.answer(
+            f"✅ **Рекламный канал успешно добавлен!**\n\n"
+            f"📌 Название: {title}\n"
+            f"🔗 Юзернейм: {channel_username}\n"
+            f"🔗 Ссылка: {link}",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        await message.answer(f"❌ Ошибка! Не удалось найти канал или получить информацию.\n\nПроверь, добавлен ли бот в этот канал как администратор.\n`Ошибка: {e}`", parse_mode="Markdown")
+
+# --- УДАЛЕНИЕ РЕКЛАМЫ ЧЕРЕЗ /delrek ---
+@dp.message_handler(commands=['delrek'])
+async def delete_ad_command(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS and ADMIN_IDS != [123456789]:
+        return await message.answer("❌ У вас нет прав для этой команды.")
+
+    args = message.get_args().strip()
+    if not args:
+        return await message.answer("⚠️ Использование: `/delrek @username`", parse_mode="Markdown")
+
+    channel_username = args.split('/')[-1]
+    if not channel_username.startswith('@'):
+        channel_username = f"@{channel_username}"
+
+    if channel_username in REQUIRED_CHANNELS:
+        REQUIRED_CHANNELS.remove(channel_username)
+        # Удаляем из кнопок
+        keys_to_delete = [k for k, v in SPONSOR_LINKS.items() if channel_username.lower() in v.lower()]
+        for k in keys_to_delete:
+            del SPONSOR_LINKS[k]
+            
+        await message.answer(f"✅ Канал {channel_username} удален из проверки и кнопок!")
+    else:
+        await message.answer(f"⚠️ Канал {channel_username} не найден в списке подписок.")
 
 @dp.message_handler(commands=['clear_kb'])
 async def clear_keyboard_command(message: types.Message):
-    await message.answer(
-        "Старые кнопки удалены! Теперь всё чисто. 👍", 
-        reply_markup=ReplyKeyboardRemove()
-    )
+    await message.answer("Старые кнопки удалены! 👍", reply_markup=ReplyKeyboardRemove())
 
 @dp.message_handler(commands=['start'])
 async def start_command(message: types.Message):
@@ -82,37 +143,34 @@ async def start_command(message: types.Message):
     msg_id = args.replace('msg', '')
     user_id = message.from_user.id
     
-    # Запускаем проверку подписок
     is_subscribed = await check_all_subscriptions(user_id)
 
     if is_subscribed:
         try:
-            # Чистое копирование файла из архива БЕЗ надписи "Переслано из"
             await bot.copy_message(
                 chat_id=user_id,
                 from_chat_id=ARCHIVE_CHAT_ID,
                 message_id=int(msg_id),
-                reply_markup=ReplyKeyboardRemove() # Сносит клавиатуру, если она была
+                reply_markup=ReplyKeyboardRemove()
             )
         except Exception as e:
-            await message.answer("❌ Произошла ошибка при отправке файла. Возможно, этот файл был удален из архива.")
+            await message.answer("❌ Произошла ошибка при отправке файла. Возможно, он был удален из архива.")
             logging.error(f"Ошибка отправки файла: {e}")
     else:
         keyboard = InlineKeyboardMarkup(row_width=1)
         
-        # Выводим только активные каналы из настроек (без знака #)
         for text, url in SPONSOR_LINKS.items():
             keyboard.add(InlineKeyboardButton(text=text, url=url))
             
-        # Кнопка авто-проверки (перезапускает ту же ссылку на скачивание)
         bot_username = (await bot.get_me()).username
         check_url = f"https://t.me/{bot_username}?start=msg{msg_id}"
         keyboard.add(InlineKeyboardButton(text="🔄 Я подписался, проверить!", url=check_url))
         
         await message.answer(
-            "⚠️ **Для получения файла нужно подписаться на наш канал!**\n\n"
+            "⚠️ **Для получения файла нужно подписаться на наши каналы:**\n\n"
             "Пожалуйста, подпишитесь и затем нажмите кнопку проверки:",
-            reply_markup=keyboard
+            reply_markup=keyboard,
+            parse_mode="Markdown"
         )
 
 if __name__ == '__main__':
